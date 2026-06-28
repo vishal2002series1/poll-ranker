@@ -1,0 +1,58 @@
+{
+  "name": "timewidget",
+  "version": "1.0.0",
+  "description": "Classroom Timer Widget for Teachers",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vishal2002series1/classroom-timer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^36.3.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.classroomtimer.app",
+    "productName": "Classroom Timer",
+    "compression": "maximum",
+    "asar": true,
+    "removePackageScripts": true,
+    "removePackageKeywords": true,
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": true,
+      "differentialPackage": false
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "!**/node_modules/**/*",
+      "!**/{.git,.github,.vscode,.idea}/**/*",
+      "!**/{*.md,*.markdown,LICENSE*,license*,CHANGELOG*,changelog*,HISTORY*,history*,AUTHORS*,authors*}",
+      "!**/{.DS_Store,Thumbs.db,.gitignore,.gitattributes,.editorconfig,.eslintrc*,.prettierrc*,.travis.yml,.npmignore}",
+      "!**/{test,tests,spec,specs,example,examples,docs,doc}/**/*",
+      "!**/*.{ts,map,d.ts}"
+    ]
+  }
+}

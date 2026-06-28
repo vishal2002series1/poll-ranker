@@ -1,0 +1,247 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0f1117;
+  color: #e0e0e0;
+  padding: 24px;
+  font-size: 14px;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.settings-container {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2d36;
+}
+
+.header-icon {
+  font-size: 1.4rem;
+}
+
+h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+.section-hint {
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 10px;
+  margin-top: -6px;
+}
+
+/* Toggle group */
+.toggle-group {
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #2a2d36;
+  border-radius: 6px;
+  background: #1a1d26;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.toggle-btn.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.toggle-btn:hover:not(.active) {
+  border-color: #444;
+  color: #ccc;
+}
+
+/* Presets */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  padding: 7px 4px;
+  border: 1px solid #2a2d36;
+  border-radius: 6px;
+  background: #1a1d26;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.preset-btn:hover,
+.preset-btn.selected {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Custom duration */
+.custom-duration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-duration label {
+  font-size: 0.8rem;
+  color: #777;
+  white-space: nowrap;
+}
+
+.custom-duration input {
+  width: 90px;
+  padding: 6px 10px;
+  border: 1px solid #2a2d36;
+  border-radius: 6px;
+  background: #1a1d26;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.custom-duration input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.apply-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.duration-display {
+  font-size: 0.8rem;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Zone rows */
+.zone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zone-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.zone-pct {
+  font-size: 0.75rem;
+  color: #666;
+  min-width: 58px;
+}
+
+.zone-input {
+  flex: 1;
+  padding: 7px 12px;
+  border: 1px solid #2a2d36;
+  border-radius: 6px;
+  background: #1a1d26;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.zone-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid #2a2d36;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #2a2d36;
+  border-radius: 8px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  border-color: #555;
+  color: #ccc;
+}
+
+.btn-save {
+  flex: 2;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+.btn-save:hover {
+  background: #1d4ed8;
+}

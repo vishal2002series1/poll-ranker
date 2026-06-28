@@ -1,0 +1,377 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  background: transparent;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+button {
+  -webkit-app-region: no-drag;
+  cursor: pointer;
+}
+
+.hidden { display: none !important; }
+
+/* ── CIRCULAR ── */
+#circular-widget {
+  position: relative;
+  width: 320px;
+  height: 390px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible;
+}
+
+#dial {
+  display: block;
+  margin: 0 auto;        /* keep the canvas centered inside the wider container */
+}
+
+#center-display {
+  position: absolute;
+  top: 148px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+#time-display {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+  letter-spacing: 2px;
+}
+
+/* Controls sit BELOW the circle. Fixed width so the pill is always the
+   same size regardless of dial size — resizing the dial never affects it. */
+#controls {
+  display: flex;
+  gap: 8px;
+  margin: 6px auto 0;          /* horizontal auto = always centered, even on Windows */
+  padding: 6px 12px;
+  background: rgba(15,15,25,0.75);
+  border-radius: 30px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  width: 384px;                /* 8 × 36px buttons + 7 × 8px gaps + 24px padding */
+  flex: 0 0 auto;
+  flex-shrink: 0;              /* never compress, even if container is briefly narrower */
+  justify-content: center;
+  align-self: center;
+  box-sizing: border-box;
+}
+
+#controls button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+#controls button:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+#controls .font-btn,
+#bar-controls .font-btn {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+/* ── BAR ── */
+html, body { height: 100%; }
+
+#bar-widget {
+  width: 100vw;
+  height: 100vh;         /* fill the window; window height is set by main.js */
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The colored strip takes all available space above the controls row. */
+#bar-strip {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  overflow: hidden;
+}
+
+#bar-segments {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+.bar-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-right: 1px solid rgba(0,0,0,0.3);
+  transition: filter 0.4s;
+}
+
+.bar-segment.dimmed {
+  filter: brightness(0.35);
+}
+
+#bar-marker {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.8);
+  transition: left 0.8s linear;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#bar-time-overlay {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 11;
+  transition: left 0.8s linear;
+  white-space: nowrap;
+}
+
+#bar-controls {
+  flex: 0 0 40px;        /* fixed height; matches BAR_CONTROLS_H in main.js */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: rgba(15,15,25,0.92);
+  z-index: 20;
+}
+
+#bar-controls button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#bar-controls button:hover {
+  background: rgba(255,255,255,0.3);
+}
+#btn-exit, #bar-btn-exit {
+  background: rgba(220, 50, 50, 0.3) !important;
+  color: #ff6b6b !important;
+}
+
+#btn-exit:hover, #bar-btn-exit:hover {
+  background: rgba(220, 50, 50, 0.7) !important;
+  color: #ffffff !important;
+}
+
+/* ── RESIZE GRIPS ── */
+#resize-grip {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  color: rgba(255,255,255,0.4);
+  font-size: 1rem;
+  cursor: nwse-resize;
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+  z-index: 100;
+}
+
+#resize-grip:hover {
+  color: rgba(255,255,255,0.9);
+}
+
+/* ── VERTICAL ── */
+#vertical-widget {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+  display: flex;
+  flex-direction: column;
+}
+
+#vertical-strip {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  overflow: hidden;
+}
+
+#vertical-segments {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0; left: 0;
+}
+
+.vertical-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(0,0,0,0.3);
+  transition: filter 0.4s;
+  text-align: center;
+  padding: 0 6px;
+}
+
+.vertical-segment.dimmed {
+  filter: brightness(0.35);
+}
+
+#vertical-marker {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255,255,255,0.8);
+  transition: top 0.8s linear;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#vertical-time-overlay {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 11;
+  transition: top 0.8s linear;
+  white-space: nowrap;
+}
+
+/* 8 buttons arranged in a 4-column × 2-row grid so they always fit
+   inside a narrow vertical panel without clipping. */
+#vertical-controls {
+  flex: 0 0 64px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 28px;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(15,15,25,0.92);
+  z-index: 20;
+  align-content: center;
+  justify-items: center;
+}
+
+#vertical-controls button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#vertical-controls button:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+#vertical-resize-grip {
+  position: absolute;
+  bottom: 50%;
+  left: 2px;
+  transform: translateY(50%);
+  width: 6px;
+  height: 40px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 3px;
+  cursor: ew-resize;
+  -webkit-app-region: no-drag;
+  transition: background 0.2s;
+  z-index: 100;
+}
+
+#vertical-resize-grip:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+#bar-resize-grip {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 6px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 3px;
+  cursor: ns-resize;
+  -webkit-app-region: no-drag;
+  transition: background 0.2s;
+  z-index: 100;
+}
+
+#bar-resize-grip:hover {
+  background: rgba(255,255,255,0.6);
+}
