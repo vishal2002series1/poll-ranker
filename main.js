@@ -1,94 +1,182 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-// Ensure only one instance of the app runs at a time. If the user launches
-// the executable again, focus the existing window instead of opening a new one.
+const { ChatScraper } = require('./src/scraper');
+const scoring = require('./src/scoring');
+const { verifyLicense } = require('./src/license');
+
+// Ensure only one instance runs at a time. Re-launch focuses the widget.
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.exit(0);
 }
 
-// FIX: Disable Hardware Acceleration to prevent graphical clipping
-// on frameless transparent windows in Windows OS.
+// Disable HW acceleration — prevents graphical clipping on frameless
+// transparent windows in Windows OS. (Carried over from the timer base.)
 app.disableHardwareAcceleration();
 
-let timerWindow = null;
+let pollWindow = null;
 let settingsWindow = null;
-let isRebuildingWindow = false;
 
-app.on('second-instance', () => {
-  if (timerWindow) {
-    if (timerWindow.isMinimized()) timerWindow.restore();
-    timerWindow.show();
-    timerWindow.focus();
-  }
-});
+// ── Persistent config ──
+const configPath = path.join(os.homedir(), '.poll-ranker-config.json');
 
-// Default settings
-let currentSettings = {
-  mode: 'circular',
-  duration: 60,
-  sound: true,
-  verticalWidth: 90,
-  zones: [
-    { label: 'Exam Topper',     threshold: 75, color: '#27ae60' },
-    { label: 'Exam Qualifier',  threshold: 50, color: '#f39c12' },
-    { label: '50-50 Chance',    threshold: 25, color: '#e67e22' },
-    { label: 'Need To Improve', threshold: 0,  color: '#e74c3c' }
-  ]
+let config = {
+  licenseKey: '',
+  streamUrl: '',
+  bufferOffsetSec: 0, // compensate for YouTube broadcast latency
+  duration: 45, // default poll length (s)
+  optionCount: 5, // 4 (A–D) or 5 (A–E)
 };
 
-// FIX: Load settings from disk before window creation so main.js knows
-// the correct window size to generate on boot.
-const settingsPath = path.join(os.homedir(), '.classroom-timer-settings.json');
-
-function loadSettingsFromDisk() {
+function loadConfig() {
   try {
-    if (fs.existsSync(settingsPath)) {
-      const diskData = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      currentSettings = { ...currentSettings, ...diskData };
+    if (fs.existsSync(configPath)) {
+      config = { ...config, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
     }
   } catch (e) {
-    console.error("Failed to load settings in main process:", e);
+    console.error('Failed to load config:', e);
   }
 }
 
-function createTimerWindow() {
-  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
-  const mode = currentSettings.mode;
-  const isBar          = mode === 'bar';
-  const isVerticalR    = mode === 'vertical';        
-  const isVerticalL    = mode === 'vertical-left';   
-  const isVertical     = isVerticalR || isVerticalL;
-
-  const MIN_WINDOW_WIDTH = 460; 
-  const BAR_CONTROLS_H   = 40;
-  const dialSize  = currentSettings.circularSize || 320;
-  const stripH    = currentSettings.barHeight    || 56;
-  const stripW    = currentSettings.verticalWidth || 90;
-
-  let winW, winH, winX, winY;
-  if (isBar) {
-    winW = screenWidth; winH = stripH + BAR_CONTROLS_H; winX = 0; winY = 0;
-  } else if (isVertical) {
-    winW = stripW;
-    winH = screenHeight;
-    winX = isVerticalL ? 0 : (screenWidth - stripW);
-    winY = 0;
-  } else {
-    winW = Math.max(MIN_WINDOW_WIDTH, dialSize);
-    winH = dialSize + 70;
-    winX = 40; winY = 40;
+function saveConfig() {
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  } catch (e) {
+    console.error('Failed to save config:', e);
   }
+}
 
-  timerWindow = new BrowserWindow({
+// ── Compact widget geometry (Phases 1–3) — landscape panel ──
+const COMPACT_W = 660;
+const COMPACT_H = 360;
+let compactBounds = null; // remembered so we can restore after a leaderboard expand
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Cumulative session.
+//  A session holds many QUESTIONS. Each question owns the active-window
+//  capture + dedup ("first valid A–E per unique voter"); scored questions are
+//  accumulated into the session-wide Top Performers board.
+// ─────────────────────────────────────────────────────────────────────────
+const session = {
+  active: false, // a question's capture window is open
+  paused: false,
+  pollStartTs: 0,
+  durationSec: 45,
+  optionCount: 5,
+  correctAnswer: null,
+  votes: new Map(), // channelId -> { channelId, handle, answer, arrivalTs } for the CURRENT question
+  scoredQuestions: [], // array of completed scoreQuestion() arrays
+
+  // Begin a new question's capture window.
+  beginQuestion(durationSec, optionCount) {
+    this.active = true;
+    this.paused = false;
+    this.pollStartTs = Date.now();
+    this.durationSec = durationSec;
+    this.optionCount = optionCount;
+    this.correctAnswer = null;
+    this.votes = new Map();
+  },
+
+  // Parse the first standalone A–E token within the option range.
+  parseAnswer(text) {
+    if (!text) return null;
+    const m = text.match(/(?:^|[^a-z])([a-e])(?:[^a-z]|$)/i);
+    if (!m) return null;
+    const letter = m[1].toUpperCase();
+    const idx = scoring.OPTION_LETTERS.indexOf(letter);
+    if (idx === -1 || idx >= this.optionCount) return null; // out of range
+    return letter;
+  },
+
+  // Ingest scraped messages. Records the FIRST valid vote per voter.
+  ingest(messages) {
+    if (!this.active || this.paused) return false;
+    let changed = false;
+    for (const msg of messages) {
+      if (this.votes.has(msg.channelId)) continue; // already voted — dedup spam
+      const answer = this.parseAnswer(msg.text);
+      if (!answer) continue;
+      this.votes.set(msg.channelId, {
+        channelId: msg.channelId,
+        handle: msg.handle || 'anonymous',
+        answer,
+        arrivalTs: msg.observedTs || Date.now(),
+      });
+      changed = true;
+    }
+    return changed;
+  },
+
+  // Timer hit zero — stop capturing but keep votes for grading.
+  freeze() {
+    this.active = false;
+  },
+
+  // Teacher picked the correct answer. Score this question, fold it into the
+  // cumulative board, and return the full leaderboard payload.
+  gradeAndCommit(correctAnswer) {
+    this.correctAnswer = correctAnswer;
+    const bufferOffsetMs = (config.bufferOffsetSec || 0) * 1000;
+    const scored = scoring.scoreQuestion([...this.votes.values()], {
+      pollStartTs: this.pollStartTs,
+      correctAnswer,
+      bufferOffsetMs,
+      timeLimitMs: this.durationSec * 1000,
+    });
+    this.scoredQuestions.push(scored);
+    return this.buildResults(scored);
+  },
+
+  // Leaderboard payload: this question's vote breakdown + cumulative ranking.
+  buildResults(thisQuestionScored) {
+    const cumulative = scoring.accumulate(this.scoredQuestions);
+    const top = scoring.topN(cumulative, 10).map((e) => ({
+      ...e,
+      lastElapsedLabel: scoring.formatElapsed(e.lastElapsedMs || 0),
+    }));
+    return {
+      totalQuestions: this.scoredQuestions.length,
+      optionCount: this.optionCount,
+      correctAnswer: this.correctAnswer,
+      tally: scoring.tally(thisQuestionScored, this.optionCount, this.correctAnswer),
+      topPerformers: top,
+    };
+  },
+
+  // Wipe everything for a brand-new session.
+  resetSession() {
+    this.active = false;
+    this.paused = false;
+    this.votes = new Map();
+    this.scoredQuestions = [];
+    this.correctAnswer = null;
+  },
+};
+
+// ── Scraper ──
+const scraper = new ChatScraper({
+  onMessages: (messages) => {
+    session.ingest(messages); // silent capture — no live tally per spec
+  },
+  onStatus: (status) => {
+    if (pollWindow) pollWindow.webContents.send('poll:status', status);
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Windows
+// ─────────────────────────────────────────────────────────────────────────
+function createPollWindow() {
+  pollWindow = new BrowserWindow({
     useContentSize: true,
-    width:  winW,
-    height: winH,
-    x: winX,
-    y: winY,
+    width: COMPACT_W,
+    height: COMPACT_H,
+    x: 80,
+    y: 80,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -96,29 +184,26 @@ function createTimerWindow() {
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: false,
-    show: false,                    
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      backgroundThrottling: false
-    }
+      backgroundThrottling: false,
+    },
   });
 
-  timerWindow.setContentSize(winW, winH);
-  timerWindow.setPosition(winX, winY);
+  pollWindow.loadFile(path.join(__dirname, 'src/poll.html'));
+  pollWindow.setAlwaysOnTop(true, 'screen-saver');
 
-  timerWindow.loadFile(path.join(__dirname, 'src/timer.html'));
-  timerWindow.setAlwaysOnTop(true, 'screen-saver');
-
-  timerWindow.once('ready-to-show', () => {
-    timerWindow.show();
+  pollWindow.once('ready-to-show', () => {
+    compactBounds = pollWindow.getBounds();
+    pollWindow.show();
   });
 
-  timerWindow.on('closed', () => {
-    timerWindow = null;
-    if (!isRebuildingWindow) {
-      app.quit();
-    }
+  pollWindow.on('closed', () => {
+    pollWindow = null;
+    scraper.stop();
+    app.quit();
   });
 }
 
@@ -127,71 +212,63 @@ function createSettingsWindow() {
     settingsWindow.focus();
     return;
   }
+  // The widget is pinned at 'screen-saver' level, so temporarily drop it
+  // below the settings window; restored when settings closes (see 'closed').
+  if (pollWindow) pollWindow.setAlwaysOnTop(false);
 
   settingsWindow = new BrowserWindow({
     width: 480,
-    height: 620,
+    height: 640,
     frame: true,
     resizable: false,
-    alwaysOnTop: false,
-    title: 'Timer Settings',
+    alwaysOnTop: true,
+    title: 'Poll Ranker — Setup',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
-    }
+      contextIsolation: false,
+    },
   });
-
   settingsWindow.loadFile(path.join(__dirname, 'src/settings.html'));
-
   settingsWindow.webContents.on('did-finish-load', () => {
-    settingsWindow.webContents.send('load-settings', currentSettings);
+    settingsWindow.webContents.send('load-config', config);
+    settingsWindow.focus();
   });
-
   settingsWindow.on('closed', () => {
     settingsWindow = null;
-    if (timerWindow) {
-      timerWindow.setAlwaysOnTop(true, 'screen-saver');
-    }
+    if (pollWindow) pollWindow.setAlwaysOnTop(true, 'screen-saver');
   });
 }
 
-// ── IPC Handlers ──
+// Expand the widget to fill the work area for the full-screen leaderboard.
+function expandToFullScreen() {
+  if (!pollWindow) return;
+  compactBounds = pollWindow.getBounds();
+  const { x, y, width, height } = screen.getDisplayMatching(compactBounds).workArea;
+  pollWindow.setBounds({ x, y, width, height });
+}
 
-ipcMain.on('open-settings', () => {
-  createSettingsWindow();
+function collapseToCompact() {
+  if (!pollWindow) return;
+  pollWindow.setBounds(compactBounds || { x: 80, y: 80, width: COMPACT_W, height: COMPACT_H });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  IPC
+// ─────────────────────────────────────────────────────────────────────────
+ipcMain.on('open-settings', () => createSettingsWindow());
+
+ipcMain.on('get-config', (event) => {
+  event.reply('config', config);
 });
 
-ipcMain.on('get-settings', (event) => {
-  event.reply('apply-settings', currentSettings);
-});
-
-ipcMain.on('save-settings', (event, newSettings) => {
-  const modeChanged = newSettings.mode !== currentSettings.mode;
-  currentSettings = newSettings;
-
+ipcMain.on('save-config', (event, newConfig) => {
+  config = { ...config, ...newConfig };
+  saveConfig();
   if (settingsWindow) {
     settingsWindow.destroy();
     settingsWindow = null;
   }
-
-  if (modeChanged) {
-    isRebuildingWindow = true;
-
-    if (timerWindow) {
-      timerWindow.destroy();
-      timerWindow = null;
-    }
-
-    setTimeout(() => {
-      isRebuildingWindow = false;
-      createTimerWindow();
-    }, 150);
-
-  } else {
-    if (timerWindow) {
-      timerWindow.webContents.send('apply-settings', currentSettings);
-    }
-  }
+  if (pollWindow) pollWindow.webContents.send('config', config);
 });
 
 ipcMain.on('cancel-settings', () => {
@@ -201,58 +278,118 @@ ipcMain.on('cancel-settings', () => {
   }
 });
 
-ipcMain.on('switch-mode', (event, newSettings) => {
-  currentSettings = newSettings;
-  isRebuildingWindow = true;
-  if (timerWindow) {
-    timerWindow.destroy();
-    timerWindow = null;
+// License verification (used by the onboarding console).
+ipcMain.handle('verify-license', async (_event, key) => {
+  const result = await verifyLicense(key);
+  if (result.valid) {
+    config.licenseKey = (key || '').trim();
+    saveConfig();
   }
-  setTimeout(() => {
-    isRebuildingWindow = false;
-    createTimerWindow();
-  }, 150);
+  return result;
 });
 
-ipcMain.on('resize-window', (event, { width, height }) => {
-  if (timerWindow) {
-    timerWindow.setContentSize(Math.round(width), Math.round(height));
+// Phase 1 → 2: start a question's capture window. Ensures the scraper is live.
+ipcMain.handle('poll:start', async (_event, { duration, optionCount }) => {
+  if (!config.streamUrl) {
+    return { ok: false, error: 'No YouTube stream URL set. Open Setup (⚙) first.' };
   }
+  config.duration = duration;
+  config.optionCount = optionCount;
+  saveConfig();
+
+  // (Re)connect the scraper to the configured stream if not already running.
+  if (!scraper.isRunning) {
+    const res = scraper.start(config.streamUrl);
+    if (!res.ok) return { ok: false, error: res.error };
+  }
+
+  session.beginQuestion(duration, optionCount);
+  return { ok: true, pollStartTs: session.pollStartTs };
 });
 
-ipcMain.on('resize-bar-window', (event, { height }) => {
-  if (timerWindow) {
-    const BAR_CONTROLS_H = 40; 
-    const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
-    timerWindow.setContentSize(screenWidth, Math.round(height) + BAR_CONTROLS_H);
-    timerWindow.setPosition(0, 0);
-  }
+// Pause / resume the active capture window.
+ipcMain.on('poll:pause', () => {
+  session.paused = true;
+});
+ipcMain.on('poll:resume', () => {
+  session.paused = false;
 });
 
-ipcMain.on('resize-vertical-window', (event, { width, side }) => {
-  if (timerWindow) {
-    const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
-    const w = Math.round(width);
-    timerWindow.setContentSize(w, screenHeight);
-    const x = side === 'left' ? 0 : (screenWidth - w);
-    timerWindow.setPosition(x, 0);
+// Phase 2 → 3: timer hit zero. Freeze capture; teacher will pick the key.
+ipcMain.on('poll:timeout', () => {
+  session.freeze();
+});
+
+// Stop the current question without grading (Stop button).
+ipcMain.on('poll:stop', () => {
+  session.freeze();
+});
+
+// Phase 3 → 4: teacher picked the correct option. Grade + commit + return.
+ipcMain.handle('poll:show-results', async (_event, correctAnswer) => {
+  return session.gradeAndCommit(correctAnswer);
+});
+
+ipcMain.on('poll:expand', () => expandToFullScreen());
+ipcMain.on('poll:collapse', () => collapseToCompact());
+
+// Next question — keep cumulative scores, return to Phase 1.
+ipcMain.on('poll:next-question', () => {
+  session.freeze();
+  collapseToCompact();
+});
+
+// End the whole session and clear cumulative scores.
+ipcMain.on('poll:end-session', () => {
+  session.resetSession();
+  scraper.stop();
+  collapseToCompact();
+});
+
+// Export the cumulative session to CSV via a native save dialog.
+ipcMain.handle('poll:export-csv', async () => {
+  const cumulative = scoring.accumulate(session.scoredQuestions);
+  const csv = scoring.buildCsv(cumulative, {
+    streamUrl: config.streamUrl,
+    totalQuestions: session.scoredQuestions.length,
+    exportedAt: new Date().toISOString(),
+  });
+
+  const { canceled, filePath } = await dialog.showSaveDialog(pollWindow, {
+    title: 'Export Leaderboard',
+    defaultPath: `poll-session-${Date.now()}.csv`,
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+  });
+  if (canceled || !filePath) return { ok: false, canceled: true };
+
+  try {
+    fs.writeFileSync(filePath, csv, 'utf8');
+    return { ok: true, filePath };
+  } catch (err) {
+    return { ok: false, error: err.message };
   }
 });
 
 ipcMain.on('exit-app', () => {
-  isRebuildingWindow = false; 
+  scraper.stop();
   if (settingsWindow) settingsWindow.destroy();
-  if (timerWindow) timerWindow.destroy();
-  app.exit(0); 
+  if (pollWindow) pollWindow.destroy();
+  app.exit(0);
+});
+
+app.on('second-instance', () => {
+  if (pollWindow) {
+    if (pollWindow.isMinimized()) pollWindow.restore();
+    pollWindow.show();
+    pollWindow.focus();
+  }
 });
 
 app.whenReady().then(() => {
-  loadSettingsFromDisk(); // <--- FIX: Ensure main process matches the saved state
-  createTimerWindow();
+  loadConfig();
+  createPollWindow();
 });
 
 app.on('window-all-closed', () => {
-  if (!isRebuildingWindow) {
-    app.exit(0);
-  }
+  app.exit(0);
 });

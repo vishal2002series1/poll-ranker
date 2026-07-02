@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Poll Ranker</title>
+  <link rel="stylesheet" href="poll.css" />
+</head>
+<body>
+  <!-- ══════════════ COMPACT WIDGET (Phases 1–3) ══════════════ -->
+  <div id="widget" class="widget">
+    <!-- White title bar (drag handle) -->
+    <div id="title-bar" class="title-bar">
+      <span class="brand"><span class="brand-mark">📊</span> Poll Ranker</span>
+      <span id="title-status" class="title-status"></span>
+      <div class="title-actions no-drag">
+        <button id="btn-gear" title="Setup">⚙</button>
+        <button id="btn-reset" title="Reset / New Session">↻</button>
+        <button id="btn-exit" title="Exit">✕</button>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <!-- LEFT column changes per phase; RIGHT is always the clock -->
+      <div class="panel-left">
+        <!-- ─── PHASE 1: INITIATION ─── -->
+        <section id="phase-init" class="phase">
+          <label class="grp-label">Poll Time (in Seconds)</label>
+          <div class="time-grid" id="time-grid">
+            <button class="time-btn" data-dur="10">10</button>
+            <button class="time-btn" data-dur="15">15</button>
+            <button class="time-btn" data-dur="30">30</button>
+            <button class="time-btn" data-dur="45">45</button>
+            <button class="time-btn" data-dur="60">60</button>
+            <button class="time-btn" data-dur="90">90</button>
+            <button class="time-btn" data-dur="120">120</button>
+            <button class="time-btn" data-dur="150">150</button>
+          </div>
+
+          <label class="grp-label">Options Count</label>
+          <div class="radio-row" id="options-row">
+            <button class="radio-btn" data-opt="4"><span class="radio-dot"></span>4 options</button>
+            <button class="radio-btn" data-opt="5"><span class="radio-dot"></span>5 options</button>
+          </div>
+
+          <button id="btn-start" class="btn-start">Start</button>
+        </section>
+
+        <!-- ─── PHASE 2 + 3 (merged): Select Correct Answer ─── -->
+        <section id="phase-poll" class="phase hidden">
+          <label class="grp-label">Select Correct Answer</label>
+          <div id="answer-grid" class="answer-grid"></div>
+          <button id="btn-show-results" class="btn-start" disabled>Show Results</button>
+        </section>
+      </div>
+
+      <!-- RIGHT: analog countdown clock + transport controls -->
+      <div class="panel-right">
+        <div class="clock-wrap">
+          <svg class="clock" viewBox="0 0 200 200">
+            <circle class="clock-face" cx="100" cy="100" r="92" />
+            <circle id="clock-progress" class="clock-progress" cx="100" cy="100" r="92" />
+            <g id="clock-ticks"></g>
+            <text x="100" y="34" class="clock-num">12</text>
+            <text x="170" y="106" class="clock-num">3</text>
+            <text x="100" y="178" class="clock-num">6</text>
+            <text x="32" y="106" class="clock-num">9</text>
+            <line id="clock-hand" class="clock-hand" x1="100" y1="100" x2="100" y2="40" />
+            <circle cx="100" cy="100" r="5" class="clock-center" />
+          </svg>
+          <div id="clock-digital" class="clock-digital hidden"><span id="clock-secs">45</span></div>
+          <div id="clock-timeout" class="clock-timeout hidden">TIME<br/>OUT</div>
+        </div>
+        <div class="transport">
+          <button id="btn-pause" class="transport-btn" title="Pause" disabled>⏸</button>
+          <button id="btn-stop" class="transport-btn" title="Stop" disabled>⏹</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ FULL-SCREEN LEADERBOARD (Phase 4) ══════════════ -->
+  <div id="leaderboard" class="leaderboard hidden">
+    <div class="lb-grid">
+      <!-- LEFT: poll result for the latest question -->
+      <div class="lb-card lb-left">
+        <h2 class="lb-h">POLL RESULT</h2>
+        <div id="lb-bars" class="lb-bars"></div>
+
+        <div class="lb-qcount">
+          <span id="lb-qnum" class="lb-qnum">1</span>
+          <span class="lb-qlbl">TOTAL QUESTION</span>
+        </div>
+
+        <div id="lb-medals" class="lb-medals"></div>
+
+        <div class="lb-stats">
+          <div class="lb-stat"><span id="lb-total" class="lb-stat-num">0</span><span class="lb-stat-lbl">Total Votes</span></div>
+          <div class="lb-stat"><span id="lb-correct" class="lb-stat-num">0</span><span class="lb-stat-lbl">Correct Answers</span></div>
+          <div class="lb-stat"><span id="lb-accuracy" class="lb-stat-num">0%</span><span class="lb-stat-lbl">Accuracy</span></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: cumulative Top Performers -->
+      <div class="lb-card lb-right">
+        <div class="lb-right-head">
+          <h2 class="lb-h">TOP PERFORMERS</h2>
+          <span class="lb-trophy">🏆</span>
+        </div>
+        <ol id="lb-list" class="lb-list"></ol>
+      </div>
+    </div>
+
+    <div class="lb-footer">
+      <button id="btn-export" class="btn-ghost">⬇ Export CSV</button>
+      <button id="btn-next" class="btn-start lb-next">＋ Next Question</button>
+      <button id="btn-end" class="btn-ghost">End Session</button>
+    </div>
+  </div>
+
+  <script src="poll.js"></script>
+</body>
+</html>

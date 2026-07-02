@@ -1,91 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <title>Timer Settings</title>
-  <link rel="stylesheet" href="settings.css"/>
+  <meta charset="UTF-8" />
+  <title>Poll Ranker — Setup</title>
+  <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
-
   <div class="settings-container">
 
     <div class="settings-header">
-      <span class="header-icon">⚙</span>
-      <h1>Timer Settings</h1>
+      <span class="header-icon">📊</span>
+      <h1>Poll Ranker — Setup</h1>
     </div>
 
-   
-
-    <!-- DURATION -->
+    <!-- LICENSE -->
     <div class="section">
-      <label class="section-title">Duration</label>
-      <div class="preset-grid">
-        <button class="preset-btn" onclick="setDuration(5)">5s</button>
-        <button class="preset-btn" onclick="setDuration(10)">10s</button>
-        <button class="preset-btn" onclick="setDuration(15)">15s</button>
-        <button class="preset-btn" onclick="setDuration(30)">30s</button>
-        <button class="preset-btn" onclick="setDuration(45)">45s</button>
-        <button class="preset-btn" onclick="setDuration(60)">1m</button>
-        <button class="preset-btn" onclick="setDuration(90)">1m 30s</button>
-        <button class="preset-btn" onclick="setDuration(120)">2m</button>
-        <button class="preset-btn" onclick="setDuration(180)">3m</button>
-        <button class="preset-btn" onclick="setDuration(300)">5m</button>
-        <button class="preset-btn" onclick="setDuration(600)">10m</button>
-        <button class="preset-btn" onclick="setDuration(900)">15m</button>
-      </div>
+      <label class="section-title">Subscription</label>
+      <p class="section-hint">Enter your license key to activate Poll Ranker.</p>
       <div class="custom-duration">
-        <label>Custom (seconds):</label>
-        <input type="number" id="custom-seconds" min="1" max="7200" placeholder="e.g. 240"/>
-        <button class="apply-btn" onclick="applyCustom()">Apply</button>
+        <input type="text" id="license-key" placeholder="e.g. PRO-2026-TEACHER" style="flex:1; width:auto;" />
+        <button class="apply-btn" onclick="checkLicense()">Activate</button>
       </div>
-      <div id="duration-display" class="duration-display">Selected: 60s</div>
+      <div id="license-status" class="duration-display"></div>
     </div>
 
-    <!-- SOUND -->
+    <!-- STREAM URL -->
     <div class="section">
-      <label class="section-title">Sound Alert</label>
-      <div class="toggle-group">
-        <button class="toggle-btn active" id="sound-on" onclick="setSound(true)">
-          🔔 On
-        </button>
-        <button class="toggle-btn" id="sound-off" onclick="setSound(false)">
-          🔕 Off
-        </button>
+      <label class="section-title">YouTube Live Stream</label>
+      <p class="section-hint">Paste the URL of your live stream (watch, youtu.be, or /live link).</p>
+      <input type="text" id="stream-url" class="zone-input" style="width:100%;"
+             placeholder="https://www.youtube.com/watch?v=..." />
+    </div>
+
+    <!-- BUFFER OFFSET -->
+    <div class="section">
+      <label class="section-title">Latency Buffer</label>
+      <p class="section-hint">Compensate for YouTube broadcast delay. Subtracted from each vote's response time.</p>
+      <div class="custom-duration">
+        <label>Offset (seconds):</label>
+        <input type="number" id="buffer-offset" min="0" max="120" step="0.5" placeholder="0" />
       </div>
     </div>
 
-    <!-- ZONE LABELS -->
+    <!-- DEFAULT POLL -->
     <div class="section">
-      <label class="section-title">Zone Labels</label>
-      <p class="section-hint">Shown on timer as time decreases ↓</p>
-      <div class="zone-list">
-        <div class="zone-row">
-          <span class="zone-dot" style="background:#27ae60"></span>
-          <span class="zone-pct">75–100%</span>
-          <input type="text" id="zone-0" class="zone-input" maxlength="20" placeholder="e.g. Exam Topper"/>
-        </div>
-        <div class="zone-row">
-          <span class="zone-dot" style="background:#f39c12"></span>
-          <span class="zone-pct">50–75%</span>
-          <input type="text" id="zone-1" class="zone-input" maxlength="20" placeholder="e.g. Exam Qualifier"/>
-        </div>
-        <div class="zone-row">
-          <span class="zone-dot" style="background:#e67e22"></span>
-          <span class="zone-pct">25–50%</span>
-          <input type="text" id="zone-2" class="zone-input" maxlength="20" placeholder="e.g. 50-50 Chance"/>
-        </div>
-        <div class="zone-row">
-          <span class="zone-dot" style="background:#e74c3c"></span>
-          <span class="zone-pct">0–25%</span>
-          <input type="text" id="zone-3" class="zone-input" maxlength="20" placeholder="e.g. Need To Improve"/>
-        </div>
+      <label class="section-title">Default Poll</label>
+      <p class="section-hint">Pre-selected when you open a new poll.</p>
+      <div class="preset-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <button class="preset-btn" data-dur="30" onclick="setDuration(30)">30s</button>
+        <button class="preset-btn" data-dur="45" onclick="setDuration(45)">45s</button>
+        <button class="preset-btn" data-dur="60" onclick="setDuration(60)">60s</button>
+      </div>
+      <div class="toggle-group" style="margin-top:8px;">
+        <button class="toggle-btn" id="opt-4" onclick="setOptions(4)">4 Options (A–D)</button>
+        <button class="toggle-btn" id="opt-5" onclick="setOptions(5)">5 Options (A–E)</button>
       </div>
     </div>
 
     <!-- ACTIONS -->
     <div class="actions">
       <button class="btn-cancel" onclick="cancel()">Cancel</button>
-      <button class="btn-save" onclick="save()">Save & Apply</button>
+      <button class="btn-save" onclick="save()">Save</button>
     </div>
 
   </div>

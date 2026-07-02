@@ -1,97 +1,67 @@
 const { ipcRenderer } = require('electron');
 
-let selectedDuration = 60;
-let selectedMode = 'circular';
-let selectedSound = true;
+let selDuration = 30;
+let selOptions = 4;
+let licenseValid = false;
 
-// Load current settings when window opens
-ipcRenderer.on('load-settings', (event, settings) => {
-  selectedDuration = settings.duration;
-  selectedMode     = settings.mode;
-  selectedSound    = settings.sound;
-
-  // Apply mode
-  setMode(selectedMode, true);
-
-  // Apply sound
-  setSound(selectedSound, true);
-
-  // Apply duration display
-  updateDurationDisplay();
-
-  // Highlight matching preset if any
-  highlightPreset(selectedDuration);
-
-  // Apply zone labels
-  settings.zones.forEach((zone, i) => {
-    const input = document.getElementById(`zone-${i}`);
-    if (input) input.value = zone.label;
-  });
+// Load current config when the window opens.
+ipcRenderer.on('load-config', (_e, config) => {
+  document.getElementById('license-key').value = config.licenseKey || '';
+  document.getElementById('stream-url').value = config.streamUrl || '';
+  document.getElementById('buffer-offset').value = config.bufferOffsetSec ?? 0;
+  selDuration = config.duration || 30;
+  selOptions = config.optionCount || 4;
+  if (config.licenseKey) {
+    licenseValid = true;
+    setLicenseStatus('Activated ✓', false);
+  }
+  syncControls();
 });
 
-function setMode(mode, silent = false) {
-  selectedMode = mode;
-  document.getElementById('mode-circular').classList.toggle('active', mode === 'circular');
-  document.getElementById('mode-bar').classList.toggle('active', mode === 'bar');
-}
-
-function setSound(val, silent = false) {
-  selectedSound = val;
-  document.getElementById('sound-on').classList.toggle('active', val === true);
-  document.getElementById('sound-off').classList.toggle('active', val === false);
-}
-
-function setDuration(seconds) {
-  selectedDuration = seconds;
-  updateDurationDisplay();
-  highlightPreset(seconds);
-  document.getElementById('custom-seconds').value = '';
-}
-
-function applyCustom() {
-  const val = parseInt(document.getElementById('custom-seconds').value);
-  if (!val || val < 1) return;
-  selectedDuration = val;
-  updateDurationDisplay();
-  highlightPreset(null); // clear preset highlights
-}
-
-function highlightPreset(seconds) {
-  document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.classList.remove('selected');
+function syncControls() {
+  document.querySelectorAll('.preset-btn').forEach((b) => {
+    b.classList.toggle('selected', Number(b.dataset.dur) === selDuration);
   });
-  const presets = [5,10,15,30,45,60,90,120,180,300,600,900];
-  const idx = presets.indexOf(seconds);
-  if (idx !== -1) {
-    document.querySelectorAll('.preset-btn')[idx].classList.add('selected');
+  document.getElementById('opt-4').classList.toggle('active', selOptions === 4);
+  document.getElementById('opt-5').classList.toggle('active', selOptions === 5);
+}
+
+function setDuration(s) {
+  selDuration = s;
+  syncControls();
+}
+function setOptions(n) {
+  selOptions = n;
+  syncControls();
+}
+
+function setLicenseStatus(msg, isError) {
+  const el = document.getElementById('license-status');
+  el.textContent = msg;
+  el.style.color = isError ? '#e74c3c' : '#27ae60';
+}
+
+async function checkLicense() {
+  const key = document.getElementById('license-key').value;
+  setLicenseStatus('Checking…', false);
+  const result = await ipcRenderer.invoke('verify-license', key);
+  licenseValid = result.valid;
+  if (result.valid) {
+    setLicenseStatus(`Activated ✓ (${result.plan})`, false);
+  } else {
+    setLicenseStatus(result.reason || 'Invalid key', true);
   }
 }
 
-function updateDurationDisplay() {
-  const m = Math.floor(selectedDuration / 60);
-  const s = selectedDuration % 60;
-  let text = '';
-  if (m > 0) text += `${m}m `;
-  if (s > 0) text += `${s}s`;
-  document.getElementById('duration-display').textContent = `Selected: ${text.trim()}`;
-}
-
 function save() {
-  const zones = [
-    { label: document.getElementById('zone-0').value || 'Exam Topper',     threshold: 75, color: '#27ae60' },
-    { label: document.getElementById('zone-1').value || 'Exam Qualifier',  threshold: 50, color: '#f39c12' },
-    { label: document.getElementById('zone-2').value || '50-50 Chance',    threshold: 25, color: '#e67e22' },
-    { label: document.getElementById('zone-3').value || 'Need To Improve', threshold: 0,  color: '#e74c3c' },
-  ];
-
-  const newSettings = {
-    mode:     selectedMode,
-    duration: selectedDuration,
-    sound:    selectedSound,
-    zones:    zones
+  const newConfig = {
+    licenseKey: document.getElementById('license-key').value.trim(),
+    streamUrl: document.getElementById('stream-url').value.trim(),
+    bufferOffsetSec: parseFloat(document.getElementById('buffer-offset').value) || 0,
+    duration: selDuration,
+    optionCount: selOptions,
   };
-
-  ipcRenderer.send('save-settings', newSettings);
+  ipcRenderer.send('save-config', newConfig);
 }
 
 function cancel() {

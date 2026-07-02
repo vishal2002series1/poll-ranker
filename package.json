@@ -1,11 +1,12 @@
 {
-  "name": "timewidget",
+  "name": "poll-ranker",
   "version": "1.0.0",
-  "description": "Classroom Timer Widget for Teachers",
+  "description": "Live YouTube Chat Poll Ranker — floating widget for live-streaming educators",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win --x64"
+    "build:win": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac"
   },
   "repository": {
     "type": "git",
@@ -19,8 +20,8 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "com.classroomtimer.app",
-    "productName": "Classroom Timer",
+    "appId": "com.pollranker.app",
+    "productName": "Poll Ranker",
     "compression": "maximum",
     "asar": true,
     "removePackageScripts": true,
