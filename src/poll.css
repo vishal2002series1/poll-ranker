@@ -127,14 +127,26 @@ html, body {
 
 /* Big green Start / Show Results button */
 .btn-start {
-  margin-top: auto;
-  padding: 13px;
+  margin: 20px 0 30px 0;
+  padding: 16px 24px;
   background: var(--green);
-  border: none; border-radius: 9px;
+  border: none; border-radius: 10px;
   color: #10300a;
   font-size: 16px; font-weight: 700;
   cursor: pointer; transition: filter 0.15s, transform 0.05s;
+  width: 100%;
+  max-width: 220px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: 50px;
+  position: relative;
+  z-index: 2;
 }
+.btn-start:hover { filter: brightness(1.06); }
+.btn-start:active { transform: scale(0.99); }
 .btn-start:hover { filter: brightness(1.06); }
 .btn-start:active { transform: scale(0.99); }
 .btn-start:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -168,7 +180,7 @@ html, body {
 /* ── Analog countdown clock (right column) ── */
 .clock-wrap { position: relative; width: 190px; height: 190px; }
 .clock { width: 100%; height: 100%; }
-.clock-face { fill: #fbfdff; stroke: #cdd6ea; stroke-width: 2; }
+.clock-face { fill: #ffffff; stroke: #d1d5db; stroke-width: 1; }
 .clock-progress {
   fill: none;
   stroke: var(--blue);
@@ -181,10 +193,10 @@ html, body {
   transition: stroke-dashoffset 1s linear;
 }
 .clock-progress.run { stroke: var(--green-deep); }
-.clock-num { fill: #3a4566; font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
-.clock-hand { stroke: var(--blue); stroke-width: 3; stroke-linecap: round; transform-origin: 100px 100px; transition: transform 1s linear; }
-.clock-center { fill: var(--blue); }
-.clock-tick { stroke: #b9c3dc; stroke-width: 1.5; }
+.clock-num { fill: #374151; font-size: 15px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+.clock-hand { stroke: #1f2937; stroke-width: 4; stroke-linecap: round; transform-origin: 100px 100px; transition: transform 1s linear; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1)); }
+.clock-center { fill: #1f2937; }
+.clock-tick { stroke: #9ca3af; stroke-width: 1.2; }
 
 .clock-digital {
   position: absolute; inset: 0;

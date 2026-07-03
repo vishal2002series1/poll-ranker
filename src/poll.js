@@ -90,7 +90,18 @@ document.querySelectorAll('#options-row .radio-btn').forEach((b) => {
 document.getElementById('btn-start').addEventListener('click', async () => {
   const btn = document.getElementById('btn-start');
   btn.disabled = true;
-  const res = await ipcRenderer.invoke('poll:start', { duration: selDuration, optionCount: selOptions });
+
+  // Check if custom duration is active and should be used
+  const customInput = document.getElementById('custom-duration');
+  let effectiveDuration = selDuration;
+
+  // If custom input has a value and it's valid, use that instead
+  const inputValue = parseInt(customInput.value);
+  if (!isNaN(inputValue) && inputValue >= 1 && inputValue <= 300) {
+    effectiveDuration = inputValue;
+  }
+
+  const res = await ipcRenderer.invoke('poll:start', { duration: effectiveDuration, optionCount: selOptions });
   btn.disabled = false;
   if (!res.ok) { setTitle('⚠ ' + res.error, false); return; }
   startPollPhase();
@@ -110,7 +121,7 @@ function startPollPhase() {
   document.getElementById('clock-progress').classList.add('run');
   document.getElementById('clock-timeout').classList.add('hidden');
   document.getElementById('clock-digital').classList.remove('hidden');
-  updateClock(remaining, selDuration);
+  updateClock(remaining, selDuration, true);
 
   // Transport: pause enabled, stop enabled. Show Results disabled until graded.
   document.getElementById('btn-pause').disabled = false;
@@ -125,7 +136,7 @@ function startPollPhase() {
 function tick() {
   if (paused) return;
   remaining -= 1;
-  updateClock(remaining, selDuration);
+  updateClock(remaining, selDuration, true);
   if (remaining <= 0) {
     clearInterval(countdownTimer);
     onTimeout();
@@ -142,15 +153,33 @@ function onTimeout() {
   // Show Results becomes available once a correct answer is selected.
 }
 
-function updateClock(secs, total) {
+function updateClock(secs, total, instant = false) {
   document.getElementById('clock-secs').textContent = Math.max(0, secs);
   const frac = total > 0 ? Math.max(0, secs) / total : 0;
   const prog = document.getElementById('clock-progress');
+  const clockHand = document.getElementById('clock-hand');
+
+  // On an instant set (poll start / reset) suppress the transition so the hand
+  // and ring snap into place instead of spinning back from the previous state.
+  if (instant) {
+    prog.style.transition = 'none';
+    clockHand.style.transition = 'none';
+  }
+
   prog.style.strokeDasharray = `${CLOCK_CIRC}`;
   prog.style.strokeDashoffset = `${CLOCK_CIRC * (1 - frac)}`;
   // Hand sweeps clockwise as time elapses (full circle over the whole duration).
+  // Drive rotation through the CSS `transform` property (not the SVG attribute)
+  // so it animates with the CSS transition and pivots at transform-origin.
   const angle = (1 - frac) * 360;
-  document.getElementById('clock-hand').setAttribute('transform', `rotate(${angle} 100 100)`);
+  clockHand.style.transform = `rotate(${angle}deg)`;
+
+  if (instant) {
+    // Force reflow, then restore transitions for the subsequent ticks.
+    void prog.getBoundingClientRect();
+    prog.style.transition = '';
+    clockHand.style.transition = '';
+  }
 }
 
 function buildAnswerGrid() {
@@ -295,13 +324,69 @@ function resetToInit() {
   document.getElementById('clock-timeout').classList.add('hidden');
   document.getElementById('clock-digital').classList.remove('hidden');
   document.getElementById('clock-secs').textContent = selDuration;
-  updateClock(selDuration, selDuration);
+  updateClock(selDuration, selDuration, true);
   setTitle('', false);
 }
 
 // ── Scraper status → title bar ──
 ipcRenderer.on('poll:status', (_e, status) => {
   if (status.state === 'error') setTitle('⚠ ' + (status.detail || 'Chat error'), false);
+});
+
+// Handle custom duration input
+document.getElementById('btn-set-custom').addEventListener('click', () => {
+  const customInput = document.getElementById('custom-duration');
+  const duration = parseInt(customInput.value);
+
+  if (isNaN(duration) || duration < 1 || duration > 300) {
+    customInput.style.borderColor = '#e74c3c';
+    setTimeout(() => {
+      customInput.style.borderColor = '';
+    }, 2000);
+    return;
+  }
+
+  selDuration = duration;
+  syncInitControls();
+  customInput.value = '';  // Clear the input after setting
+});
+
+// Auto-select custom mode when user starts typing in custom input field
+document.getElementById('custom-duration').addEventListener('focus', () => {
+  // When user focuses on the custom input, switch to custom mode
+  // Remove selection from preset buttons
+  document.querySelectorAll('#time-grid .time-btn').forEach((b) => {
+    b.classList.remove('active');
+  });
+});
+
+// Update selDuration when user enters a valid custom value
+document.getElementById('custom-duration').addEventListener('input', () => {
+  const customInput = document.getElementById('custom-duration');
+  const inputValue = parseInt(customInput.value);
+  if (!isNaN(inputValue) && inputValue >= 1 && inputValue <= 300) {
+    selDuration = inputValue;
+  }
+});
+
+// Allow Enter key in custom duration input - automatically set custom duration
+document.getElementById('custom-duration').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    const customInput = document.getElementById('custom-duration');
+    const duration = parseInt(customInput.value);
+
+    if (!isNaN(duration) && duration >= 1 && duration <= 300) {
+      selDuration = duration;
+      syncInitControls();
+      customInput.value = '';  // Clear the input after setting
+    } else {
+      // If invalid, show error
+      customInput.style.borderColor = '#e74c3c';
+      setTimeout(() => {
+        customInput.style.borderColor = '';
+      }, 2000);
+    }
+  }
 });
 
 // ── util ──
@@ -314,4 +399,4 @@ function escapeHtml(s) {
 // Boot
 showPhase('init');
 syncInitControls();
-updateClock(selDuration, selDuration);
+updateClock(selDuration, selDuration, true);
